@@ -2,7 +2,8 @@ syntax = "proto2";
 package seldon.protos;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
-import "v1.proto";
+import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/api/autoscaling/v2beta1/generated.proto";
 
 option java_package = "io.seldon.protos";
 option java_outer_classname = "DeploymentProtos";
@@ -41,15 +42,37 @@ message DeploymentSpec {
   map<string,string> annotations = 5; // Arbitrary annotations.
 }
 
+message Explainer {
+  optional string type = 1; // Type of explainer
+  optional string modelUri = 2; // Bucket or PVC location of explainer model
+  optional string serviceAccountName = 3; // Service account for pulling from bucket
+  optional string envSecretRefName = 4; // Secret for pulling from bucket
+  optional k8s.io.api.core.v1.Container containerSpec = 5; // Custom spec for explainer
+}
+
 message PredictorSpec {
   required string name = 1; // A unique name not used by any other predictor in the deployment.
   required PredictiveUnit graph = 2; // A graph describing how the predictive units are connected together.
-  repeated k8s.io.api.core.v1.PodTemplateSpec componentSpecs = 3; // A description of the set of containers used by the graph. One for each microservice defined in the graph. Can be split over 1 or more PodTemplateSpecs.
+  repeated SeldonPodSpec componentSpecs = 3; // A description of the set of containers used by the graph. One for each microservice defined in the graph. Can be split over 1 or more PodTemplateSpecs.
   optional int32 replicas = 4; // The number of replicas of the predictor to create.
   map<string,string> annotations = 5; // Arbitrary annotations.
   optional k8s.io.api.core.v1.ResourceRequirements engineResources = 6 [deprecated=true]; // Optional set of resources for the Seldon engine which is added to each Predictor graph to manage the request/response flow
   map<string,string> labels = 7; // labels to be attached to entry deplyment for this predictor
   optional SvcOrchSpec svcOrchSpec = 8; // Service Orchestrator configuration
+  optional int32 traffic = 9; // traffic weight for this predictor
+  optional Explainer explainer = 10; // Explainer for predictor
+}
+
+message SeldonPodSpec {
+ optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+ optional k8s.io.api.core.v1.PodSpec spec = 2;
+ optional SeldonHpaSpec hpaSpec = 3;
+}
+
+message SeldonHpaSpec {
+  optional int32 minReplicas = 1;
+  optional int32 maxReplicas = 2;
+  repeated k8s.io.api.autoscaling.v2beta1.MetricSpec metrics = 3;
 }
 
 message SvcOrchSpec {
@@ -83,6 +106,10 @@ message PredictiveUnit {
     SIMPLE_ROUTER = 2; // An internal router for testing.
     RANDOM_ABTEST = 3; // A A-B test that sends traffic 50% to each child randomly.
     AVERAGE_COMBINER = 4; // A default combiner that returns the average of its children responses.
+    SKLEARN_SERVER = 5; // default sklearn server
+    XGBOOST_SERVER = 6; // default xgboost server
+    TENSORFLOW_SERVER = 7; // default tensorflow server    
+    MLFLOW_SERVER = 8; // default mlflow server    
   }
 
   enum PredictiveUnitMethod {
@@ -100,6 +127,9 @@ message PredictiveUnit {
   repeated PredictiveUnitMethod methods = 5;
   optional Endpoint endpoint = 6; // The exposed endpoint for this unit.
   repeated Parameter parameters = 7; // Customer parameter to pass to the unit.
+  optional string modelUri = 8; // Location of saved model
+  optional string serviceAccountName = 9; // Service account for pulling model bucket
+  optional string envSecretRefName = 10; // Secret for pulling from bucket
 }
 
 message Endpoint {

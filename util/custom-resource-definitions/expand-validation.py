@@ -8,25 +8,51 @@ def getDefinition(uri):
 
 def expand(defn,root):
     if "properties" in defn:
+        badProps = []
         for prop in defn["properties"].keys():
             if "$ref" in defn["properties"][prop]:
                 ref = getDefinition(defn["properties"][prop]["$ref"])
                 defnNew = expand(root["definitions"][ref],root)
-                defn["properties"][prop] = defnNew
+                if defnNew:
+                    defn["properties"][prop] = defnNew
+                else:
+                    badProps.append(prop)
             elif "items" in defn["properties"][prop] and "$ref" in defn["properties"][prop]["items"]:
                 ref = getDefinition(defn["properties"][prop]["items"]["$ref"])
                 defnNew = expand(root["definitions"][ref],root)
-                defn["properties"][prop]["items"] = defnNew
+                if defnNew:
+                    defn["properties"][prop]["items"] = defnNew
+                else:
+                    badProps.append(prop)
+            ## Temporary hack until https://github.com/go-openapi/validate/issues/108 is fixed
+            ## Causes failure of CRD validation with properties with "items" property
+            if "items" in defn["properties"] and "items" in defn["properties"]["items"]:
+                return None
+        for prop in badProps:
+            del defn["properties"][prop]
     return defn
 
 def simplifyAdditionalProperties(defn):
     if isinstance(defn, dict):
         if "additionalProperties" in defn.keys():
-            defn["additionalProperties"] = True
+            if isinstance(defn["additionalProperties"], dict):
+                if "$ref" in defn["additionalProperties"].keys():
+                    del defn["additionalProperties"]
+                    #defn["additionalProperties"] = True
         for k in defn.keys():
             simplifyAdditionalProperties(defn[k])
 
+def removeDescriptions(defn):
+    if isinstance(defn, dict):
+        if "description" in defn.keys():
+            del defn["description"]
+        for k in defn.keys():
+            removeDescriptions(defn[k])
 
+"""
+Expands the Swagger JSON for the Root Item by expanding out the $ref items to their referring JSON
+Needed as CRD OpenAPI validation can't handle $ref elements
+"""
 if __name__ == '__main__':
     import logging
     logger = logging.getLogger()
@@ -35,7 +61,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(prog='create_replay')
     parser.add_argument('--swagger', help='Swagger OpenAPI file', default="swagger.json")
-    parser.add_argument('--root', help='root defn', default="io.k8s.api.core.v1.PodTemplateSpec")
+    parser.add_argument('--root', help='root defn', default="io.k8s.api.core.v1.PodSpec")
 
     args = parser.parse_args()
     opts = vars(args)
@@ -45,4 +71,5 @@ if __name__ == '__main__':
     root = data["definitions"][args.root]
     expandedRoot = expand(root,data)
     simplifyAdditionalProperties(expandedRoot)
-    print json.dumps(expandedRoot,indent=4)
+    removeDescriptions(expandedRoot)
+    print(json.dumps(expandedRoot,indent=4))

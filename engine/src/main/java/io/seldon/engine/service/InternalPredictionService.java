@@ -247,6 +247,7 @@ public class InternalPredictionService {
     
     public SeldonMessage transformInput(SeldonMessage input, PredictiveUnitState state) throws InvalidProtocolBufferException
     {
+    	logger.info("Calling grpc for transform-input");
     	final Endpoint endpoint = state.endpoint;
 		switch (endpoint.getType()){
 			case REST:
@@ -267,11 +268,20 @@ public class InternalPredictionService {
 							.withMaxOutboundMessageSize(grpcMaxMessageSize);
 						return genStub.transformInput(input);
 					case MODEL:
-						ModelBlockingStub modelStub = ModelGrpc.newBlockingStub(grpcChannelHandler.get(endpoint))
-							.withDeadlineAfter(grpcReadTimeout, TimeUnit.MILLISECONDS)
-							.withMaxInboundMessageSize(grpcMaxMessageSize)
-							.withMaxOutboundMessageSize(grpcMaxMessageSize);
-						return modelStub.predict(input);
+						try
+						{
+							ModelBlockingStub modelStub = ModelGrpc.newBlockingStub(grpcChannelHandler.get(endpoint))
+								.withDeadlineAfter(grpcReadTimeout, TimeUnit.MILLISECONDS)
+								.withMaxInboundMessageSize(grpcMaxMessageSize)
+								.withMaxOutboundMessageSize(grpcMaxMessageSize);
+							logger.info(modelStub.getCallOptions().toString());
+							return modelStub.predict(input);
+						}
+						catch (Exception e)
+						{
+							logger.error("grpc exception ",e);
+							throw e;
+						}
 					case TRANSFORMER:
 						TransformerBlockingStub transformerStub = TransformerGrpc.newBlockingStub(grpcChannelHandler.get(endpoint))
 						.withDeadlineAfter(grpcReadTimeout, TimeUnit.MILLISECONDS)
@@ -441,13 +451,4 @@ public class InternalPredictionService {
 		logger.error("Failed to retrueve predictions after {} attempts",restRetries);
 		throw new APIException(APIException.ApiExceptionType.ENGINE_MICROSERVICE_ERROR,String.format("Failed to retrieve predictions after %d attempts",restRetries));
 	}
-
-	 /**
-     * Used only for testing. Should be replaced by better methods that use Spring and Mockito to create a Mock RestTemplate for testing
-     * @param predictorSpec
-     */
-	public void setRestTemplate(RestTemplate restTemplate) { // FIXME
-		this.restTemplate = restTemplate;
-	}
-
 }

@@ -1,8 +1,12 @@
-FROM openjdk:8u181-jre-alpine3.8
+FROM openjdk:8u222-jre-slim
 
 ARG APP_VERSION=UNKOWN_VERSION
 
-RUN apk add curl
+RUN \
+    apt-get update -y && \
+    apt-get install -y curl && \
+    apt-get remove -y --auto-remove && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY /target/seldon-engine-${APP_VERSION}.jar app.jar
 COPY /target/generated-resources /licenses/

@@ -28,9 +28,21 @@
                                                 "name": "grafana-prom-secret"
                                             }
                                         }
+                                    },
+                                    {{- range $key, $value := .Values.grafana.extraEnv }}
+                                    {
+                                        "name": "{{ $key }}",
+                                        "value": "{{ $value }}"
+                                    },
+                                    {{- end}}
+                                    {{ if .Values.grafana_anonymous_auth }}
+                                    {
+                                        "name": "GF_AUTH_ANONYMOUS_ENABLED",
+                                        "value": "true"
                                     }
+                                    {{ end }}
                                 ],
-                                "image": "grafana/grafana:5.3.4",
+                                "image": "grafana/grafana:6.1.6",
                                 "name": "grafana",
                                 "ports": [
                                     {

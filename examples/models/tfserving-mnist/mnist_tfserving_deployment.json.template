@@ -15,21 +15,21 @@
                     "spec": {
                         "containers": [
                             {
-                                "image": "seldonio/tfserving-proxy:0.1",
+                                "image": "seldonio/tfserving-proxy:0.4",
                                 "name": "tfserving-proxy"
                             },
 			    {
 				"args": [
 				    "/usr/bin/tensorflow_model_server",
-				    "--port=8000",
+				    "--port=7001",
 				    "--model_name=mnist-model",
-				    "--model_base_path=gs://seldon-tfserving-store/mnist-model"
+				    "--model_base_path=gs://seldon-models/tfserving/mnist-model"
 				],
-				"image": "gcr.io/kubeflow-images-public/tensorflow-serving-1.7:v20180604-0da89b8a",
+				"image": "tensorflow/serving:latest",
 				"name": "mnist-model",
 				"ports": [
 				    {
-					"containerPort": 8000,
+					"containerPort": 7001,
 					"protocol": "TCP"
 				    }
 				],
@@ -61,7 +61,7 @@
 			{
 			    "name":"grpc_endpoint",
 			    "type":"STRING",
-			    "value":"localhost:8000"
+			    "value":"localhost:7001"
 			},
 			{
 			    "name":"model_name",
